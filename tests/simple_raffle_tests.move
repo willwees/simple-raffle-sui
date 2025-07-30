@@ -5,6 +5,7 @@ module simple_raffle::simple_raffle_tests {
     use sui::coin::{Self};
     use sui::sui::SUI;
     use sui::test_utils::assert_eq;
+    use sui::random::{Self, Random};
 
     // Test addresses
     const OWNER: address = @0xA;
@@ -112,9 +113,15 @@ module simple_raffle::simple_raffle_tests {
 
     #[test]
     fun test_pick_winner_success() {
-        let mut scenario = test::begin(OWNER);
+        let mut scenario = test::begin(@0x0); // Use system address for Random creation
         
-        // Create raffle
+        // Create the Random object for testing
+        {
+            random::create_for_testing(ctx(&mut scenario));
+        };
+        
+        // Create raffle (switch to OWNER)
+        next_tx(&mut scenario, OWNER);
         {
             simple_raffle::create_raffle(ctx(&mut scenario));
         };
@@ -151,7 +158,9 @@ module simple_raffle::simple_raffle_tests {
         next_tx(&mut scenario, OWNER);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            simple_raffle::pick_winner(&mut raffle, ctx(&mut scenario));
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario));
+            test::return_shared(random_state);
             test::return_shared(raffle);
         };
         
@@ -160,9 +169,15 @@ module simple_raffle::simple_raffle_tests {
 
     #[test, expected_failure(abort_code = 2)]
     fun test_pick_winner_not_owner() {
-        let mut scenario = test::begin(OWNER);
+        let mut scenario = test::begin(@0x0); // Use system address for Random creation
+
+        // Create the Random object for testing
+        {
+            random::create_for_testing(ctx(&mut scenario));
+        };
         
-        // Create raffle
+        // Create raffle (switch to OWNER)
+        next_tx(&mut scenario, OWNER);
         {
             simple_raffle::create_raffle(ctx(&mut scenario));
         };
@@ -181,7 +196,9 @@ module simple_raffle::simple_raffle_tests {
         next_tx(&mut scenario, PLAYER1);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            simple_raffle::pick_winner(&mut raffle, ctx(&mut scenario)); // Should fail
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario)); // Should fail
+            test::return_shared(random_state);
             test::return_shared(raffle);
         };
         
@@ -196,12 +213,19 @@ module simple_raffle::simple_raffle_tests {
         {
             simple_raffle::create_raffle(ctx(&mut scenario));
         };
+
+        // Create the Random object for testing
+        {
+            random::create_for_testing(ctx(&mut scenario));
+        };
         
         // Owner tries to pick winner with no participants
         next_tx(&mut scenario, OWNER);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            simple_raffle::pick_winner(&mut raffle, ctx(&mut scenario)); // Should fail
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario)); // Should fail
+            test::return_shared(random_state);
             test::return_shared(raffle);
         };
         
@@ -210,9 +234,15 @@ module simple_raffle::simple_raffle_tests {
 
     #[test, expected_failure(abort_code = 0)]
     fun test_join_closed_raffle() {
-        let mut scenario = test::begin(OWNER);
+        let mut scenario = test::begin(@0x0); // Use system address for Random creation
+
+        // Create the Random object for testing
+        {
+            random::create_for_testing(ctx(&mut scenario));
+        };
         
-        // Create raffle
+        // Create raffle (switch to OWNER)
+        next_tx(&mut scenario, OWNER);
         {
             simple_raffle::create_raffle(ctx(&mut scenario));
         };
@@ -231,7 +261,9 @@ module simple_raffle::simple_raffle_tests {
         next_tx(&mut scenario, OWNER);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            simple_raffle::pick_winner(&mut raffle, ctx(&mut scenario));
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario));
+            test::return_shared(random_state);
             test::return_shared(raffle);
         };
         
@@ -250,9 +282,15 @@ module simple_raffle::simple_raffle_tests {
 
     #[test, expected_failure(abort_code = 0)]
     fun test_pick_winner_twice() {
-        let mut scenario = test::begin(OWNER);
+        let mut scenario = test::begin(@0x0); // Use system address for Random creation
+
+        // Create the Random object for testing
+        {
+            random::create_for_testing(ctx(&mut scenario));
+        };
         
-        // Create raffle
+        // Create raffle (switch to OWNER)
+        next_tx(&mut scenario, OWNER);
         {
             simple_raffle::create_raffle(ctx(&mut scenario));
         };
@@ -271,7 +309,9 @@ module simple_raffle::simple_raffle_tests {
         next_tx(&mut scenario, OWNER);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            simple_raffle::pick_winner(&mut raffle, ctx(&mut scenario));
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario));
+            test::return_shared(random_state);
             test::return_shared(raffle);
         };
         
@@ -279,7 +319,9 @@ module simple_raffle::simple_raffle_tests {
         next_tx(&mut scenario, OWNER);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            simple_raffle::pick_winner(&mut raffle, ctx(&mut scenario)); // Should fail
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario)); // Should fail
+            test::return_shared(random_state);
             test::return_shared(raffle);
         };
         

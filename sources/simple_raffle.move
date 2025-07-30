@@ -4,6 +4,7 @@ module simple_raffle::simple_raffle {
     use sui::tx_context::{Self, TxContext};
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
+    use sui::random::{Self, Random};
 
     // === Error Codes ===
     const ERaffleNotOpen: u64 = 0;
@@ -49,16 +50,17 @@ module simple_raffle::simple_raffle {
     }
 
     /// Pick a winner and transfer the pool.
-    public entry fun pick_winner(raffle: &mut Raffle, ctx: &mut TxContext) {
+    public entry fun pick_winner(raffle: &mut Raffle, r: &Random, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
         assert!(raffle.is_open, ERaffleNotOpen);
         assert!(sender == raffle.owner, ENotOwner);
         let count = vector::length(&raffle.entrants);
         assert!(count > 0, ENoEntrants);
 
-        // Pseudo-random index (use block time hash for simple demo purposes)
-        let seed = tx_context::epoch(ctx); // epoch used as seed
-        let index = seed % count;
+        // TODO: use Chainlink VRF or similar for better randomness
+        // Use a simple random selection method
+        let mut generator = random::new_generator(r, ctx);
+        let index = random::generate_u64_in_range(&mut generator, 0, count - 1);
 
         let winner = *vector::borrow(&raffle.entrants, index);
         raffle.is_open = false;

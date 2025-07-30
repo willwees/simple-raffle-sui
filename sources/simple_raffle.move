@@ -10,10 +10,11 @@ module simple_raffle::simple_raffle {
     const ERaffleNotOpen: u64 = 0;
     const EInsufficientPayment: u64 = 1;
     const ENotOwner: u64 = 2;
-    const ENoEntrants: u64 = 3;
-    const EAlreadyJoined: u64 = 4;
+    const EAlreadyJoined: u64 = 3;
+    const EInsufficientParticipants: u64 = 4;
 
     const ENTRY_FEE: u64 = 1_000_000_000; // 1 SUI (1e9 = 1 SUI)
+    const MIN_PARTICIPANTS: u64 = 2; // Minimum participants to pick a winner
 
     /// The raffle object.
     public struct Raffle has key {
@@ -60,7 +61,7 @@ module simple_raffle::simple_raffle {
         assert!(raffle.is_open, ERaffleNotOpen);
         assert!(sender == raffle.owner, ENotOwner);
         let count = vector::length(&raffle.entrants);
-        assert!(count > 0, ENoEntrants);
+        assert!(count >= MIN_PARTICIPANTS, EInsufficientParticipants);
 
         // TODO: use Chainlink VRF or similar for better randomness
         // Use a simple random selection method

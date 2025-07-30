@@ -111,6 +111,38 @@ module simple_raffle::simple_raffle_tests {
         test::end(scenario);
     }
 
+    #[test, expected_failure(abort_code = 4)]
+    fun test_join_raffle_duplicate_entry() {
+        let mut scenario = test::begin(OWNER);
+        
+        // Create raffle
+        {
+            simple_raffle::create_raffle(ctx(&mut scenario));
+        };
+        
+        // Player joins raffle
+        next_tx(&mut scenario, PLAYER1);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        // Same player tries to join again
+        next_tx(&mut scenario, PLAYER1);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario)); // Should fail with EAlreadyJoined (4)
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        test::end(scenario);
+    }
+
     #[test]
     fun test_pick_winner_success() {
         let mut scenario = test::begin(@0x0); // Use system address for Random creation

@@ -11,6 +11,7 @@ module simple_raffle::simple_raffle {
     const EInsufficientPayment: u64 = 1;
     const ENotOwner: u64 = 2;
     const ENoEntrants: u64 = 3;
+    const EAlreadyJoined: u64 = 4;
 
     const ENTRY_FEE: u64 = 1_000_000_000; // 1 SUI (1e9 = 1 SUI)
 
@@ -42,6 +43,10 @@ module simple_raffle::simple_raffle {
         assert!(coin::value(payment) >= ENTRY_FEE, EInsufficientPayment);
 
         let sender = tx_context::sender(ctx);
+
+        // Check for duplicate entries
+        assert!(!vector::contains(&raffle.entrants, &sender), EAlreadyJoined);
+
         vector::push_back(&mut raffle.entrants, sender);
 
         let accepted = coin::split(payment, ENTRY_FEE, ctx);

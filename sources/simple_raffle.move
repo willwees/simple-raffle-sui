@@ -75,4 +75,31 @@ module simple_raffle::simple_raffle {
         let prize = coin::split(&mut raffle.pool, pool_value, ctx);
         transfer::public_transfer(prize, winner);
     }
+
+    // === View Functions ===
+
+    // Get the list of entrants
+    public fun get_entrants(raffle: &Raffle): &vector<address> {
+        &raffle.entrants
+    }
+
+    // View the number of entrants
+    public fun get_entrant_count(raffle: &Raffle): u64 {
+        vector::length(&raffle.entrants)
+    }
+
+    // Get the total value in the raffle pool
+    public fun get_pool_value(raffle: &Raffle): u64 {
+        coin::value(&raffle.pool)
+    }
+
+    // Check if the raffle is open
+    public fun is_open(raffle: &Raffle): bool {
+        raffle.is_open
+    }
+
+    // View the owner of the raffle
+    public fun get_owner(raffle: &Raffle): address {
+        raffle.owner
+    }
 }

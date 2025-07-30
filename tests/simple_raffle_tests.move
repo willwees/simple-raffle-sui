@@ -359,4 +359,55 @@ module simple_raffle::simple_raffle_tests {
         
         test::end(scenario);
     }
+
+    #[test]
+    fun test_view_functions() {
+        let mut scenario = test::begin(OWNER);
+        
+        // Create raffle
+        {
+            simple_raffle::create_raffle(ctx(&mut scenario));
+        };
+        
+        // Test initial state
+        next_tx(&mut scenario, OWNER);
+        {
+            let raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            
+            // Check initial values
+            assert_eq(simple_raffle::get_entrant_count(&raffle), 0);
+            assert_eq(simple_raffle::get_pool_value(&raffle), 0);
+            assert_eq(simple_raffle::is_open(&raffle), true);
+            assert_eq(simple_raffle::get_owner(&raffle), OWNER);
+            assert_eq(vector::length(simple_raffle::get_entrants(&raffle)), 0);
+            
+            test::return_shared(raffle);
+        };
+        
+        // Player joins
+        next_tx(&mut scenario, PLAYER1);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        // Test updated state
+        next_tx(&mut scenario, OWNER);
+        {
+            let raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            
+            // Check updated values
+            assert_eq(simple_raffle::get_entrant_count(&raffle), 1);
+            assert_eq(simple_raffle::get_pool_value(&raffle), 1_000_000_000);
+            assert_eq(simple_raffle::is_open(&raffle), true);
+            assert_eq(*vector::borrow(simple_raffle::get_entrants(&raffle), 0), PLAYER1);
+            
+            test::return_shared(raffle);
+        };
+        
+        test::end(scenario);
+    }
 }

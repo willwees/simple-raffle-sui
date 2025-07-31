@@ -5,6 +5,7 @@ module simple_raffle::simple_raffle {
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
     use sui::random::{Self, Random};
+    use sui::event;
 
     // === Error Codes ===
     const ERaffleNotOpen: u64 = 0;
@@ -25,6 +26,26 @@ module simple_raffle::simple_raffle {
         pool: Coin<SUI>,
     }
 
+    // === Events ===
+    public struct RaffleCreated has copy, drop {
+        raffle_id: ID,
+        owner: address,
+    }
+
+    public struct PlayerJoined has copy, drop {
+        raffle_id: ID,
+        player: address,
+        total_entrants: u64,
+    }
+
+    public struct WinnerPicked has copy, drop {
+        raffle_id: ID,
+        winner: address,
+        prize_amount: u64,
+    }
+
+    // === Functions ===
+
     /// Create a new raffle.
     public entry fun create_raffle(ctx: &mut TxContext) {
         let pool = coin::zero<SUI>(ctx);
@@ -35,6 +56,13 @@ module simple_raffle::simple_raffle {
             is_open: true,
             pool,
         };
+
+        // Emit event for raffle creation
+        event::emit(RaffleCreated {
+            raffle_id: object::uid_to_inner(&raffle.id),
+            owner: raffle.owner,
+        });
+
         transfer::share_object(raffle);
     }
 
@@ -52,6 +80,15 @@ module simple_raffle::simple_raffle {
 
         let accepted = coin::split(payment, ENTRY_FEE, ctx);
         coin::join(&mut raffle.pool, accepted);
+
+        // Emit event for player joining
+        let total_entrants = vector::length(&raffle.entrants);
+        event::emit(PlayerJoined {
+            raffle_id: object::uid_to_inner(&raffle.id),
+            player: sender,
+            total_entrants,
+        });
+
         // Remainder will be automatically returned if not used
     }
 
@@ -75,6 +112,13 @@ module simple_raffle::simple_raffle {
         let pool_value = coin::value(&raffle.pool);
         let prize = coin::split(&mut raffle.pool, pool_value, ctx);
         transfer::public_transfer(prize, winner);
+
+        // Emit event for winner
+        event::emit(WinnerPicked {
+            raffle_id: object::uid_to_inner(&raffle.id),
+            winner: winner,
+            prize_amount: pool_value,
+        });
     }
 
     // === View Functions ===

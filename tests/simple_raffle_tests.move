@@ -158,6 +158,19 @@ module simple_raffle::simple_raffle_tests {
             simple_raffle::create_raffle(ctx(&mut scenario));
         };
         
+        // Test initial winner state
+        next_tx(&mut scenario, OWNER);
+        {
+            let raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            
+            // Initially no winner
+            assert_eq(simple_raffle::has_winner(&raffle), false);
+            assert_eq(option::is_none(&simple_raffle::get_winner(&raffle)), true);
+            assert_eq(simple_raffle::is_open(&raffle), true);
+            
+            test::return_shared(raffle);
+        };
+        
         // Multiple players join
         next_tx(&mut scenario, PLAYER1);
         {
@@ -186,6 +199,19 @@ module simple_raffle::simple_raffle_tests {
             test::return_shared(raffle);
         };
         
+        // Still no winner before picking
+        next_tx(&mut scenario, OWNER);
+        {
+            let raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            
+            assert_eq(simple_raffle::has_winner(&raffle), false);
+            assert_eq(option::is_none(&simple_raffle::get_winner(&raffle)), true);
+            assert_eq(simple_raffle::is_open(&raffle), true);
+            assert_eq(simple_raffle::get_entrant_count(&raffle), 3);
+            
+            test::return_shared(raffle);
+        };
+        
         // Owner picks winner
         next_tx(&mut scenario, OWNER);
         {
@@ -193,6 +219,24 @@ module simple_raffle::simple_raffle_tests {
             let random_state = test::take_shared<Random>(&scenario);
             simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario));
             test::return_shared(random_state);
+            test::return_shared(raffle);
+        };
+        
+        // Test winner state after picking
+        next_tx(&mut scenario, OWNER);
+        {
+            let raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            
+            // Now should have a winner
+            assert_eq(simple_raffle::has_winner(&raffle), true);
+            assert_eq(option::is_some(&simple_raffle::get_winner(&raffle)), true);
+            assert_eq(simple_raffle::is_open(&raffle), false);
+            assert_eq(simple_raffle::get_pool_value(&raffle), 0); // Prize transferred
+            
+            // Winner should be one of the participants
+            let winner = *option::borrow(&simple_raffle::get_winner(&raffle));
+            assert_eq(winner == PLAYER1 || winner == PLAYER2 || winner == PLAYER3, true);
+            
             test::return_shared(raffle);
         };
         
@@ -411,6 +455,8 @@ module simple_raffle::simple_raffle_tests {
             assert_eq(simple_raffle::is_open(&raffle), true);
             assert_eq(simple_raffle::get_owner(&raffle), OWNER);
             assert_eq(vector::length(simple_raffle::get_entrants(&raffle)), 0);
+            assert_eq(simple_raffle::has_winner(&raffle), false);
+            assert_eq(option::is_none(&simple_raffle::get_winner(&raffle)), true);
             
             test::return_shared(raffle);
         };
@@ -435,6 +481,8 @@ module simple_raffle::simple_raffle_tests {
             assert_eq(simple_raffle::get_pool_value(&raffle), 1_000_000_000);
             assert_eq(simple_raffle::is_open(&raffle), true);
             assert_eq(*vector::borrow(simple_raffle::get_entrants(&raffle), 0), PLAYER1);
+            assert_eq(simple_raffle::has_winner(&raffle), false);
+            assert_eq(option::is_none(&simple_raffle::get_winner(&raffle)), true);
             
             test::return_shared(raffle);
         };

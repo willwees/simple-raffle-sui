@@ -24,6 +24,7 @@ module simple_raffle::simple_raffle {
         entrants: vector<address>,
         is_open: bool,
         pool: Coin<SUI>,
+        winner: Option<address>,
     }
 
     // === Events ===
@@ -55,6 +56,7 @@ module simple_raffle::simple_raffle {
             entrants: vector::empty<address>(),
             is_open: true,
             pool,
+            winner: option::none<address>(),
         };
 
         // Emit event for raffle creation
@@ -107,6 +109,7 @@ module simple_raffle::simple_raffle {
 
         let winner = *vector::borrow(&raffle.entrants, index);
         raffle.is_open = false;
+        raffle.winner = option::some(winner);
 
         // Transfer the prize
         let pool_value = coin::value(&raffle.pool);
@@ -146,5 +149,15 @@ module simple_raffle::simple_raffle {
     // View the owner of the raffle
     public fun get_owner(raffle: &Raffle): address {
         raffle.owner
+    }
+
+    // Get the winner of the raffle
+    public fun get_winner(raffle: &Raffle): Option<address> {
+        raffle.winner
+    }
+
+    // Check if the raffle has a winner
+    public fun has_winner(raffle: &Raffle): bool {
+        option::is_some(&raffle.winner)
     }
 }

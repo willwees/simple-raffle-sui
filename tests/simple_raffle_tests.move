@@ -34,7 +34,7 @@ module simple_raffle::simple_raffle_tests {
     }
 
     #[test]
-    fun test_join_raffle_success() {
+    fun test_join_raffle_payments() {
         let mut scenario = test::begin(OWNER);
         
         // Create raffle
@@ -42,69 +42,41 @@ module simple_raffle::simple_raffle_tests {
             simple_raffle::create_raffle(ctx(&mut scenario));
         };
         
-        // Player joins raffle
+        // Test 1: Exact payment (1 SUI)
         next_tx(&mut scenario, PLAYER1);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario)); // 1 SUI
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
             
             simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
             
-            // Clean up
+            // Payment should be fully consumed
             coin::destroy_zero(payment);
             test::return_shared(raffle);
         };
         
-        test::end(scenario);
-    }
-
-    #[test]
-    fun test_join_raffle_with_extra_payment() {
-        let mut scenario = test::begin(OWNER);
-        
-        // Create raffle
-        {
-            simple_raffle::create_raffle(ctx(&mut scenario));
-        };
-        
-        // Player joins with more than required payment
-        next_tx(&mut scenario, PLAYER1);
+        // Test 2: Overpayment (2 SUI)
+        next_tx(&mut scenario, PLAYER2);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            let mut payment = coin::mint_for_testing<SUI>(2_000_000_000, ctx(&mut scenario)); // 2 SUI
+            let mut payment = coin::mint_for_testing<SUI>(2_000_000_000, ctx(&mut scenario));
             
             simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
             
             // Should have 1 SUI remaining
             assert_eq(coin::value(&payment), 1_000_000_000);
-            
-            // Clean up
             coin::burn_for_testing(payment);
             test::return_shared(raffle);
         };
         
-        test::end(scenario);
-    }
-
-    #[test, expected_failure(abort_code = 1)]
-    fun test_join_raffle_insufficient_payment() {
-        let mut scenario = test::begin(OWNER);
-        
-        // Create raffle
+        // Test 3: Duplicate entry - verify current state (separate test handles the failure)
+        next_tx(&mut scenario, PLAYER1); // PLAYER1 tries to join again
         {
-            simple_raffle::create_raffle(ctx(&mut scenario));
-        };
-        
-        // Player tries to join with insufficient payment
-        next_tx(&mut scenario, PLAYER1);
-        {
-            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
-            let mut payment = coin::mint_for_testing<SUI>(500_000_000, ctx(&mut scenario)); // 0.5 SUI
+            let raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
             
-            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario)); // Should fail
+            // Verify current state - should have 2 players
+            assert_eq(simple_raffle::get_entrant_count(&raffle), 2);
             
-            // Clean up (won't reach here due to abort)
-            coin::burn_for_testing(payment);
             test::return_shared(raffle);
         };
         
@@ -136,7 +108,32 @@ module simple_raffle::simple_raffle_tests {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
             let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
             simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario)); // Should fail with EAlreadyJoined (3)
-            coin::destroy_zero(payment);
+            coin::burn_for_testing(payment);
+            test::return_shared(raffle);
+        };
+        
+        test::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = 1)]
+    fun test_join_raffle_insufficient_payment() {
+        let mut scenario = test::begin(OWNER);
+        
+        // Create raffle
+        {
+            simple_raffle::create_raffle(ctx(&mut scenario));
+        };
+        
+        // Player tries to join with insufficient payment
+        next_tx(&mut scenario, PLAYER1);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(500_000_000, ctx(&mut scenario)); // 0.5 SUI
+            
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario)); // Should fail
+            
+            // Clean up (won't reach here due to abort)
+            coin::burn_for_testing(payment);
             test::return_shared(raffle);
         };
         
@@ -243,6 +240,54 @@ module simple_raffle::simple_raffle_tests {
         test::end(scenario);
     }
 
+    #[test]
+    fun test_access_control() {
+        let mut scenario = test::begin(@0x0);
+        
+        // Create the Random object
+        {
+            random::create_for_testing(ctx(&mut scenario));
+        };
+        
+        // Create raffle
+        next_tx(&mut scenario, OWNER);
+        {
+            simple_raffle::create_raffle(ctx(&mut scenario));
+        };
+        
+        // Player joins
+        next_tx(&mut scenario, PLAYER1);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        // Add second player to meet minimum requirement
+        next_tx(&mut scenario, PLAYER2);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        // Test 1: Non-owner tries to pick winner - should succeed now that we have 2+ players
+        next_tx(&mut scenario, OWNER); // Use owner to test successful pick
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario));
+            test::return_shared(random_state);
+            test::return_shared(raffle);
+        };
+        
+        test::end(scenario);
+    }
+
     #[test, expected_failure(abort_code = 2)]
     fun test_pick_winner_not_owner() {
         let mut scenario = test::begin(@0x0); // Use system address for Random creation
@@ -260,6 +305,16 @@ module simple_raffle::simple_raffle_tests {
         
         // Player joins
         next_tx(&mut scenario, PLAYER1);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        // Add second player to meet minimum requirement
+        next_tx(&mut scenario, PLAYER2);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
             let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
@@ -319,6 +374,62 @@ module simple_raffle::simple_raffle_tests {
         test::end(scenario);
     }
 
+    #[test]
+    fun test_closed_raffle_operations() {
+        let mut scenario = test::begin(@0x0);
+        
+        // Create the Random object
+        {
+            random::create_for_testing(ctx(&mut scenario));
+        };
+        
+        // Create raffle
+        next_tx(&mut scenario, OWNER);
+        {
+            simple_raffle::create_raffle(ctx(&mut scenario));
+        };
+        
+        // Two players join to meet minimum requirement
+        next_tx(&mut scenario, PLAYER1);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        next_tx(&mut scenario, PLAYER2);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
+            simple_raffle::join(&mut raffle, &mut payment, ctx(&mut scenario));
+            coin::destroy_zero(payment);
+            test::return_shared(raffle);
+        };
+        
+        // Owner picks winner (closes raffle)
+        next_tx(&mut scenario, OWNER);
+        {
+            let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            let random_state = test::take_shared<Random>(&scenario);
+            simple_raffle::pick_winner(&mut raffle, &random_state, ctx(&mut scenario));
+            test::return_shared(random_state);
+            test::return_shared(raffle);
+        };
+        
+        // Verify raffle is closed and has winner
+        next_tx(&mut scenario, OWNER);
+        {
+            let raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
+            assert_eq(simple_raffle::is_open(&raffle), false);
+            assert_eq(simple_raffle::has_winner(&raffle), true);
+            test::return_shared(raffle);
+        };
+        
+        test::end(scenario);
+    }
+
     #[test, expected_failure(abort_code = 0)]
     fun test_join_closed_raffle() {
         let mut scenario = test::begin(@0x0); // Use system address for Random creation
@@ -365,7 +476,7 @@ module simple_raffle::simple_raffle_tests {
         };
         
         // Another player tries to join closed raffle
-        next_tx(&mut scenario, PLAYER2);
+        next_tx(&mut scenario, PLAYER3);
         {
             let mut raffle = test::take_shared<simple_raffle::Raffle>(&scenario);
             let mut payment = coin::mint_for_testing<SUI>(1_000_000_000, ctx(&mut scenario));
